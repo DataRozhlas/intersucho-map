@@ -1,0 +1,5 @@
+vfr2ogr --file 20180531_ST_UKSG.xml.gz --format GPKG --layer KatastralniUzemi --geom GeneralizovaneHranice --dsn ku.gpkg
+
+tippecanoe -o tiles.mbtiles -z 15 -pk -pC -b 20 -pS -pt ku.json 
+
+mb-util tiles.mbtiles ./tls --image_format=pbf
