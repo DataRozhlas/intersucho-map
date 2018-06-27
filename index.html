@@ -5,8 +5,116 @@
 <!--odsud dal-->
 <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/openlayers/4.4.2/ol.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/openlayers/4.4.2/ol.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 <script src="./data/data.js"></script>
 
+<style>
+    #mapdiv {
+	position: relative;
+}
+
+#tooltip,
+#select {
+	position: absolute;
+	font-size: 14px;
+	color: rgb(102, 102, 102);
+	background-color: white;
+	padding: 7px;
+	z-index: 50;
+}
+
+#legend {
+	position: absolute;
+	background-color: white;
+	width: 87px;
+	height: 140px;
+	z-index: 50;
+	bottom: 10px;
+	left: 50px;
+	margin: 0px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	padding-left: 5px;
+}
+
+#scale {
+	background-color: red;
+	width: 20px;
+	height: 90%;
+	margin-top: 8px;
+	margin-left: 7px;
+	background: linear-gradient(to bottom,#d7191c,#fdae61,#ffffbf,#abd9e9,#2c7bb6);
+}
+
+.zisk, .ztrata {
+	position: absolute;
+	font-size: 10pt;
+	left: 40px;
+}
+.zisk {
+	top: 4px;
+}
+
+.ztrata {
+	bottom: 4px;
+}
+
+@media only screen  and (min-width : 768px) {
+	#tooltip {
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		width: 30vw;
+		max-height: 200px;
+		top: 10px;
+		right: 10px;
+	}
+	#select {
+		max-height: 200px;
+		top: 8px;
+		left: 40px;
+		z-index: 30;
+	}
+}
+
+/* mobile tooltip */
+@media only screen and (min-device-width : 320px) and (max-device-width : 480px) {
+	#tooltip {
+		border: none;
+		margin: auto;
+		padding: 0;
+		position: relative;
+		width: 100%;
+	}
+	#frm-geocode, #legend {
+		visibility: hidden;
+	}
+}
+
+#frm-geocode {
+    position: absolute;
+    top: 50px;
+    left: 48px;
+    background: white;
+    padding: 5px;
+    float: left;
+    border: 1px solid #ccc;;
+    -webkit-border-radius: 4px;
+            border-radius: 4px;
+}
+#frm-geocode label {
+    float: left;
+    clear: left;
+    font: 14px/16px Arial, Helvetica, sans-serif;
+}
+#frm-geocode .inputs {
+    float: left;
+    clear: left;
+    padding-top: 3px;
+}
+#frm-geocode input {
+    float: left;
+}
+</style>
 
 <div id="mapdiv">
 	<div id="select"></div>
@@ -14,8 +122,8 @@
 	<div id="map" class="map"></div>
 	<div id="legend">
 		<div id="scale"></div>
-		<span class="zisk">zisk</span>
-		<span class="ztrata">ztráta</span>
+		<span class="zisk">delší sucho</span>
+		<span class="ztrata">kratší sucho</span>
 	</div>
 	 <form action="?" id='frm-geocode'>
 	  <label for="inp-geocode">Najít adresu</label>
@@ -29,10 +137,18 @@
 <script>
 
 function getColor(val) {
-    var col = 'green';
+    var col = 'rgba(247,247,247,0.8)';
     if (typeof data[val] != 'undefined') {
-        if (data[val]['sucho'] >= 0.3) {
-            col = 'red';
+        if (data[val]['sucho'] > 0.8) {
+            col = 'rgba(215,25,28,0.8)';
+        } else if (data[val]['sucho'] >= 0.6) {
+            col = 'rgba(253,174,97,0.8)';
+        } else if (data[val]['sucho'] >= 0.4) {
+            col = 'rgba(255,255,191,0.8)';
+        } else if (data[val]['sucho'] >= 0.2) {
+            col = 'rgba(171,217,233,0.8)';
+        } else if (data[val]['sucho'] < 0.2) {
+            col = 'rgba(44,123,182,0.8)';
         }
     }
     
@@ -50,13 +166,15 @@ function getColor(val) {
 
 
 function makeTooltip(evt) {
-    document.getElementById('tooltip').innerHTML = 'ahoj'
+    var cint = 'Katastrální územi ' + evt['Nazev'] + ', okres ' + evt['nazvy_OKRES'] + '<br>'
+        + 'Výrazné sucho zde letos bylo v ' + Math.round(data[evt['Kod']]['sucho'] * 1000)/10 + ' % času.'
+    document.getElementById('tooltip').innerHTML = cint
 };
 
 var tilegrid = ol.tilegrid.createXYZ({tileSize: 512, maxZoom: 12});
 
 var background = new ol.layer.Tile({
-  source: new ol.source.OSM({
+  source: new ol.source.TileImage({
     url: 'https://interaktivni.rozhlas.cz/tiles/ton_b1/{z}/{x}/{y}.png',
     attributions: [
       new ol.Attribution({ html: 'obrazový podkres <a target="_blank" href="http://stamen.com">Stamen</a>, <a target="_blank" href="https://samizdat.cz">Samizdat</a>, data <a target="_blank" href="https://www.czso.cz/csu/czso/uchazeci-o-zamestnani-dosazitelni-a-podil-nezamestnanych-osob-podle-obci">ČSÚ</a>'})
@@ -65,10 +183,10 @@ var background = new ol.layer.Tile({
 })
 
 var labels = new ol.layer.Tile({
-  source: new ol.source.OSM({
+  source: new ol.source.TileImage({
     url: 'https://interaktivni.rozhlas.cz/tiles/ton_l1/{z}/{x}/{y}.png',
-    maxZoom: 11
-  })
+    maxZoom: 15
+   })
 })
 
 var layer = new ol.layer.VectorTile({
@@ -145,13 +263,13 @@ map.getView().setZoom(8)
 } else {
 $.get( "https://api.mapy.cz/geocode?query=" + text, function(data) {
     if (typeof $(data).find('item').attr('x') == 'undefined') {
-    alert("Bohužel, danou adresu nebylo možné najít");
-    return;
+        alert("Bohužel, danou adresu nebylo možné najít");
+        return;
     }
-    var x = parseFloat($(data).find('item').attr('x'))
-    var y = parseFloat($(data).find('item').attr('y'))
-    map.getView().setCenter(ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857'))
-    map.getView().setZoom(12)
+        var x = parseFloat($(data).find('item').attr('x'))
+        var y = parseFloat($(data).find('item').attr('y'))
+        map.getView().setCenter(ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857'))
+        map.getView().setZoom(12)
 }, 'xml');
 } 
 };
